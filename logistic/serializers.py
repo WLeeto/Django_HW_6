@@ -10,40 +10,32 @@ class ProductSerializer(serializers.ModelSerializer):
 
 
 class ProductPositionSerializer(serializers.ModelSerializer):
-    products = ProductSerializer(many=True)
-
+    # настройте сериализатор для позиции продукта на складе
     class Meta:
-        model = Stock
-        fields = ['address', 'products']
+        model = StockProduct
+        fields = ['product', 'quantity', 'price']
 
 
 class StockSerializer(serializers.ModelSerializer):
     positions = ProductPositionSerializer(many=True)
 
+    # настройте сериализатор для склада
     class Meta:
         model = Stock
-        fields = ['address', 'products', 'positions']
+        fields = ['address', 'positions']
 
     def create(self, validated_data):
         # достаем связанные данные для других таблиц
         positions = validated_data.pop('positions')
-        print(positions)
+
         # создаем склад по его параметрам
         stock = super().create(validated_data)
+
         # здесь вам надо заполнить связанные таблицы
         # в нашем случае: таблицу StockProduct
         # с помощью списка positions
-        Stock.objects.create(
-            address=positions['address'],
-        )
-        for position in validated_data['positions']:
-            Stock.objects.create(
-                quantity=position['quantity'],
-                price=position['price'],
-            )
-            Stock.positions.objects.create(
-                id=position['product']
-            )
+        for position in positions:
+            StockProduct.objects.create(stock=stock, **position)
 
         return stock
 
@@ -57,5 +49,9 @@ class StockSerializer(serializers.ModelSerializer):
         # здесь вам надо обновить связанные таблицы
         # в нашем случае: таблицу StockProduct
         # с помощью списка positions
+        for position in positions:
+            product = position.pop('product')
+            StockProduct.objects.update_or_create(
+                stock=stock, product=product, defaults=position)
 
-        return stock
+        return
